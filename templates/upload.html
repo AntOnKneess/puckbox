@@ -1,0 +1,20 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Audio Library Upload</h2>
+<p>Upload raw <code>.mp3</code> files directly to the storage pool directory.</p>
+
+<form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" style="margin: 20px 0; padding: 15px; border: 1px dashed #cbd5e1; background: #f8fafc; border-radius: 6px;">
+    <input type="file" name="file" accept=".mp3" required>
+    <button type="submit" class="action-btn" style="margin-left: 10px;">Upload MP3</button>
+</form>
+
+<h3>Available Audio Storage Pool</h3>
+<ul>
+    {% for file in files %}
+        <li style="margin-bottom: 8px; font-family: monospace;">{{ file }}</li>
+    {% else %}
+        <li style="color: #7f8c8d;">No audio tracks found in local directory storage.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

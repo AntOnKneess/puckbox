@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Tag-to-Audio Mapping</h2>
+<p>Assign a scanned NFC Tag ID to an uploaded audio track configuration.</p>
+
+<form action="{{ url_for('map_tag') }}" method="POST" style="margin-top: 20px;">
+    <div style="margin-bottom: 15px;">
+        <label style="display:block; margin-bottom:5px;"><b>NFC Tag ID:</b></label>
+        <input type="text" name="tag_id" required placeholder="Scan or enter tag ID" style="padding: 8px; width: 250px;">
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+        <label style="display:block; margin-bottom:5px;"><b>Select Audio Track:</b></label>
+        <select name="filename" required style="padding: 8px; width: 266px;">
+            <option value="">-- Choose a file --</option>
+            {% for file in files %}
+                <option value="{{ file }}">{{ file }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <button type="submit" class="action-btn">Save Mapping</button>
+</form>
+
+<h3>Current System Mappings</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Tag ID</th>
+            <th>Mapped Audio File</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tag, filename in mappings.items() %}
+        <tr>
+            <td><code>{{ tag }}</code></td>
+            <td>{{ filename }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2" style="color: #7f8c8d; text-align: center;">No tags mapped yet.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
