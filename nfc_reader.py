@@ -7,16 +7,19 @@ from pygame import mixer
 USING_MOCK_NFC = False
 
 try:
-    # First layer: Try importing the library
-    from mfrc522 import SimpleMFRC522
+    # First layer: Try importing the PN532 libraries
+    import board
+    import busio
+    from adafruit_pn532.i2c import PN532_I2C
     
-    # Second layer: Test instantiate it. 
-    # If RPi.GPIO throws a RuntimeError on your PC, it gets caught here.
-    _test_reader = SimpleMFRC522()
-    del _test_reader
+    # Second layer: Test instantiate it via I2C
+    i2c = busio.I2C(board.SCL, board.SDA)
+    _test_pn532 = PN532_I2C(i2c, debug=False)
+    _test_pn532.get_firmware_version()
+    del _test_pn532, i2c
     
 except (ImportError, RuntimeError, Exception) as e:
-    print(f"\n[NFC] Cannot initialize Raspberry Pi hardware ({type(e).__name__}).")
+    print(f"\n[NFC] Cannot initialize Raspberry Pi PN532 hardware ({type(e).__name__}).")
     print("      Switching to MOCK terminal mode for testing.")
     USING_MOCK_NFC = True
 
@@ -48,28 +51,41 @@ class NFCReader:
             print(f"\n[NFC] Unmapped Tag Detected: {tag_str}")
 
     def _hardware_nfc_worker(self):
-        # Re-initialize securely inside the worker context
-        reader = SimpleMFRC522()
+        import board
+        import busio
+        from adafruit_pn532.i2c import PN532_I2C
+
+        # Initialize I2C and PN532
+        i2c = busio.I2C(board.SCL, board.SDA)
+        pn532 = PN532_I2C(i2c, debug=False)
+        
+        # Configure PN532 to communicate with MiFare cards
+        pn532.SAM_configuration()
+        
         last_tag = None
         last_time = 0
         
-        print("[NFC] Hardware Reader active...")
+        print("[NFC] PN532 Hardware Reader active...")
         while self.running:
             try:
-                tag_id, _ = reader.read_no_block()
-                if tag_id:
+                # Read passive tag
+                uid = pn532.read_passive_target(timeout=0.2)
+                
+                if uid is not None:
+                    # Convert byte array UID to a hex string representation
+                    tag_id = "".join([f"{x:02X}" for x in uid])
                     current_time = time.time()
+                    
                     if tag_id != last_tag or (current_time - last_time > 3):
-                        tag_str = str(tag_id)
-                        print(f"\n[NFC] Detected Tag: {tag_str}")
-                        self._play_audio(tag_str)
+                        print(f"\n[NFC] Detected Tag: {tag_id}")
+                        self._play_audio(tag_id)
                         
                         last_tag = tag_id
                         last_time = current_time
                 else:
                     last_tag = None
                     
-                time.sleep(0.2)
+                time.sleep(0.1)
             except Exception as e:
                 print(f"[NFC Error]: {e}")
                 time.sleep(1)
