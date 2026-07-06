@@ -17,7 +17,7 @@ def create_app(tag_mappings, save_mappings_func):
 
     @app.route('/')
     def index():
-        return redirect(url_for('upload_file'))
+        return render_template('index.html') 
 
     @app.route('/upload', methods=['GET', 'POST'])
     def upload_file():
