@@ -7,9 +7,8 @@ def create_app(tag_mappings, save_mappings_func):
 
     @app.route('/')
     def index():
-        # Home page showing current mappings
-        files = os.listdir(app.config['UPLOAD_FOLDER']) if os.path.exists(app.config['UPLOAD_FOLDER']) else []
-        return render_template('index.html', mappings=tag_mappings, files=files)
+        # Simple homepage
+        return render_template('index.html')
 
     @app.route('/upload', methods=['GET', 'POST'])
     def upload_file():
@@ -25,9 +24,9 @@ def create_app(tag_mappings, save_mappings_func):
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
             return redirect(url_for('upload_file'))
         
-        # GET request: Show the upload page with existing files
+        # GET request: Consolidates files, mappings, and configuration interfaces
         files = os.listdir(app.config['UPLOAD_FOLDER']) if os.path.exists(app.config['UPLOAD_FOLDER']) else []
-        return render_template('upload.html', files=files)
+        return render_template('upload.html', mappings=tag_mappings, files=files)
 
     @app.route('/map', methods=['POST'])
     def map_tag():
@@ -36,6 +35,6 @@ def create_app(tag_mappings, save_mappings_func):
         if tag_id and filename:
             tag_mappings[tag_id] = filename
             save_mappings_func()
-        return redirect(url_for('index'))
+        return redirect(url_for('upload_file')) # Redirect back to upload management hub
 
     return app
