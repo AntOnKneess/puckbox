@@ -3,23 +3,25 @@ import time
 import threading
 from pygame import mixer
 
-# Flag to track if we are using real hardware or a mock
+# Global hardware variables
 USING_MOCK_NFC = False
+pn532_hardware = None
 
 try:
-    # First layer: Try importing the PN532 libraries
     import board
     import busio
     from adafruit_pn532.i2c import PN532_I2C
     
-    # Second layer: Test instantiate it via I2C
+    # Initialize the I2C bus cleanly once
     i2c = busio.I2C(board.SCL, board.SDA)
-    _test_pn532 = PN532_I2C(i2c, debug=False)
-    _test_pn532.get_firmware_version()
-    del _test_pn532, i2c
+    pn532_hardware = PN532_I2C(i2c, debug=False)
     
-except (ImportError, RuntimeError, Exception) as e:
-    print(f"\n[NFC] Cannot initialize Raspberry Pi PN532 hardware ({type(e).__name__}).")
+    # Verify firmware version to ensure communication works
+    pn532_hardware.get_firmware_version()
+    print("[NFC] PN532 Hardware successfully initialized!")
+    
+except (ImportError, RuntimeError, ValueError, AttributeError) as e:
+    print(f"\n[NFC] Cannot initialize Raspberry Pi PN532 hardware ({type(e).__name__}): {e}")
     print("      Switching to MOCK terminal mode for testing.")
     USING_MOCK_NFC = True
 
@@ -51,16 +53,11 @@ class NFCReader:
             print(f"\n[NFC] Unmapped Tag Detected: {tag_str}")
 
     def _hardware_nfc_worker(self):
-        import board
-        import busio
-        from adafruit_pn532.i2c import PN532_I2C
-
-        # Initialize I2C and PN532
-        i2c = busio.I2C(board.SCL, board.SDA)
-        pn532 = PN532_I2C(i2c, debug=False)
+        # Use the globally verified hardware object
+        global pn532_hardware
         
         # Configure PN532 to communicate with MiFare cards
-        pn532.SAM_configuration()
+        pn532_hardware.SAM_configuration()
         
         last_tag = None
         last_time = 0
@@ -69,10 +66,9 @@ class NFCReader:
         while self.running:
             try:
                 # Read passive tag
-                uid = pn532.read_passive_target(timeout=0.2)
+                uid = pn532_hardware.read_passive_target(timeout=0.2)
                 
                 if uid is not None:
-                    # Convert byte array UID to a hex string representation
                     tag_id = "".join([f"{x:02X}" for x in uid])
                     current_time = time.time()
                     
@@ -91,7 +87,6 @@ class NFCReader:
                 time.sleep(1)
 
     def _mock_nfc_worker(self):
-        """Simulates tag scans via terminal input for non-RPi testing."""
         print("[NFC] Mock Mode Active. Type a Tag ID in the terminal and press Enter to simulate a scan.")
         while self.running:
             try:
