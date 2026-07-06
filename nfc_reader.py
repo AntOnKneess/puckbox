@@ -17,7 +17,7 @@ try:
     pn532_hardware = PN532_I2C(i2c, debug=False)
     
     # Verify firmware version to ensure communication works
-    pn532_hardware.get_firmware_version()
+    pn532_hardware.firmware_version
     print("[NFC] PN532 Hardware successfully initialized!")
     
 except (ImportError, RuntimeError, ValueError, AttributeError) as e:
