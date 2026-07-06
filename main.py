@@ -7,7 +7,7 @@ from nfc_reader import NFCReader
 MAPPING_FILE = 'mappings.json'
 
 # Initialize local audio mixer
-mixer.init()
+mixer.init(frequency=44100, size=-16, channels=2, buffer=8192)
 
 # Load or create mappings
 if os.path.exists(MAPPING_FILE):
