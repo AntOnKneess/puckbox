@@ -8,7 +8,7 @@ scan_state = {
     "captured_tag": None
 }
 
-def create_app(tag_mappings, save_mappings_func):
+def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_func):
     app = Flask(__name__)
     app.config['UPLOAD_FOLDER'] = 'static/audio'
     
@@ -65,5 +65,16 @@ def create_app(tag_mappings, save_mappings_func):
             return jsonify({"status": "found", "tag_id": tag})
         
         return jsonify({"status": "waiting"})
+
+    @app.route('/settings', methods=['GET', 'POST'])
+    def settings_page():
+        if request.method == 'POST':
+            chosen_device = request.form.get('device_name')
+            set_device_func(chosen_device)
+            return redirect(url_for('settings_page'))
+            
+        # GET request fetches the hardware device array directly from audio_manager
+        devices = get_devices_func()
+        return render_template('settings.html', devices=devices)
 
     return app
