@@ -39,6 +39,15 @@ class NFCReader:
             threading.Thread(target=self._hardware_nfc_worker, daemon=True).start()
 
     def _play_audio(self, tag_str):
+        # Check if the web app is actively trying to capture/register a tag
+        scan_state = self.config.get('SCAN_STATE')
+        if scan_state and scan_state.get('is_scanning'):
+            print(f"\n[NFC Capture] Intercepted Tag ID for registration: {tag_str}")
+            scan_state['captured_tag'] = tag_str
+            # Optional: You could play a short "beep" sound here to confirm the scan
+            return 
+
+        # Otherwise, proceed with normal playback behavior
         if tag_str in self.tag_mappings:
             mp3_file = self.tag_mappings[tag_str]
             file_path = os.path.join(self.config['UPLOAD_FOLDER'], mp3_file)

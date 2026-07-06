@@ -1,24 +1,15 @@
-{% extends 'layout.html' %}
-
-{% block content %}
-<h2>Audio & Tag Management Hub</h2>
-<p>Upload files, configure physical tag mappings, and review active associations below.</p>
-
-<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-
-<h3>1. Upload Audio Library</h3>
-<p>Upload raw <code>.mp3</code> files directly to the storage pool directory.</p>
-<form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" style="margin: 20px 0; padding: 15px; border: 1px dashed #cbd5e1; background: #f8fafc; border-radius: 6px;">
-    <input type="file" name="file" accept=".mp3" required>
-    <button type="submit" class="action-btn" style="margin-left: 10px;">Upload MP3</button>
-</form>
-
 <h3>2. Assign Tag-to-Audio Mapping</h3>
 <p>Assign a scanned NFC Tag ID to an uploaded audio track configuration.</p>
 <form action="{{ url_for('map_tag') }}" method="POST" style="margin: 20px 0; padding: 15px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px;">
     <div style="margin-bottom: 15px;">
         <label style="display:block; margin-bottom:5px;"><b>NFC Tag ID:</b></label>
-        <input type="text" name="tag_id" required placeholder="Scan or enter tag ID" style="padding: 8px; width: 250px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="tag_id_input" name="tag_id" required placeholder="Scan or enter tag ID" style="padding: 8px; width: 250px;">
+            <button type="button" id="scan_btn" onclick="startNfcScan()" style="padding: 8px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                Scan Physical Tag
+            </button>
+        </div>
+        <span id="scan_status" style="display: block; margin-top: 5px; font-size: 0.9em; color: #64748b;"></span>
     </div>
     
     <div style="margin-bottom: 15px;">
@@ -34,42 +25,54 @@
     <button type="submit" class="action-btn">Save Mapping</button>
 </form>
 
-<hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+<script>
+let pollInterval = null;
 
-<div style="display: flex; gap: 40px; wrap: wrap;">
-    <div style="flex: 1; min-width: 300px;">
-        <h3>Current System Mappings</h3>
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="border-bottom: 2px solid #cbd5e1; text-align: left;">
-                    <th style="padding: 8px 0;">Tag ID</th>
-                    <th style="padding: 8px 0;">Mapped Audio File</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for tag, filename in mappings.items() %}
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 8px 0;"><code>{{ tag }}</code></td>
-                    <td style="padding: 8px 0;">{{ filename }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="2" style="color: #7f8c8d; padding: 15px 0; text-align: center;">No tags mapped yet.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+function startNfcScan() {
+    const btn = document.getElementById('scan_btn');
+    const statusText = document.getElementById('scan_status');
+    
+    btn.disabled = true;
+    btn.style.background = '#94a3b8';
+    statusText.innerText = "Waiting for NFC card tap... Go scan your tag now!";
+    statusText.style.color = "#ea580c";
 
-    <div style="flex: 1; min-width: 250px;">
-        <h3>Available Audio Storage Pool</h3>
-        <ul style="padding-left: 20px;">
-            {% for file in files %}
-                <li style="margin-bottom: 8px; font-family: monospace;">{{ file }}</li>
-            {% else %}
-                <li style="color: #7f8c8d; list-style-type: none; margin-left: -20px;">No audio tracks found in local storage.</li>
-            {% endfor %}
-        </ul>
-    </div>
-</div>
-{% endblock %}
+    // Tell backend to start watching for a scan
+    fetch('/api/start-scan', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            // Start checking every 500ms for a result
+            pollInterval = setInterval(checkForScan, 500);
+        })
+        .catch(err => {
+            console.error("Error starting scan:", err);
+            resetScanButton();
+        });
+}
+
+function checkForScan() {
+    fetch('/api/check-scan')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'found') {
+                // Populate input field with the captured Tag ID
+                document.getElementById('tag_id_input').value = data.tag_id;
+                
+                // Clear polling and reset UI
+                clearInterval(pollInterval);
+                resetScanButton("Tag captured successfully!", "#16a34a");
+            }
+        })
+        .catch(err => console.error("Error checking scan:", err));
+}
+
+function resetScanButton(message = "", color = "#64748b") {
+    const btn = document.getElementById('scan_btn');
+    const statusText = document.getElementById('scan_status');
+    
+    btn.disabled = false;
+    btn.style.background = '#3b82f6';
+    statusText.innerText = message;
+    statusText.style.color = color;
+}
+</script>
