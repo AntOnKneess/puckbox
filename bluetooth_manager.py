@@ -45,8 +45,8 @@ class BluetoothManager:
         except Exception as e:
             logger.exception("Unexpected structural failure during controller provisioning:")
 
-    def start_scan(self, duration=10):
-        """Runs an interactive scanner worker inside a background process thread."""
+    def start_scan(self, duration=8):
+        """Runs a robust background scan by letting the hardware pool devices, then fetching them."""
         if self._is_scanning:
             logger.warning("Scan requested, but a discovery thread loop is already running.")
             return
@@ -56,57 +56,37 @@ class BluetoothManager:
             self.discovered_devices = []
             found_registry = {}
             
-            logger.info(f"Starting background Bluetooth discovery scan ({duration}s duration)...")
+            logger.info(f"Starting background Bluetooth discovery scan ({duration}s)...")
             self._initialize_controller()
             
             try:
-                logger.debug("Opening interactive unbuffered bluetoothctl pipe stream...")
-                # Prefix the array command vector with stdbuf -oL 
-                proc = subprocess.Popen(
-                    ['stdbuf', '-oL', 'bluetoothctl', 'scan', 'on'], 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.PIPE, 
-                    text=True,
-                    bufsize=1
-                )
+                # 1. Start the hardware discovery engine
+                logger.debug("Activating hardware antenna...")
+                subprocess.run(['bluetoothctl', 'scan', 'on'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4)
                 
-                start_time = time.time()
-                while time.time() - start_time < duration:
-                    line = proc.stdout.readline()
-                    if line:
-                        # Scan live discovery lines out of stdout logs
-                        match = re.search(r'Device\s+([0-9A-Fa-f:]{17})\s+(.+)', line)
-                        if match:
-                            mac, name = match.group(1), match.group(2).strip()
-                            if name and ":" not in name and "-" not in name:
-                                if mac not in found_registry:
-                                    logger.info(f"Discovered new device in range: '{name}' [{mac}]")
-                                found_registry[mac] = name
-                    else:
-                        time.sleep(0.1)
-                        
-                logger.debug("Terminating active scanning process...")
-                proc.terminate()
-                proc.wait()
+                # 2. Wait a few seconds for the antenna to catch nearby broadcasting waves
+                time.sleep(duration)
                 
-                # Check for standard error lines if the process failed early
-                stderr_output = proc.stderr.read()
-                if stderr_output.strip():
-                    logger.error(f"Subprocess scanner returned errors: {stderr_output.strip()}")
+                # 3. Turn scanning back off safely so we don't hog wireless bandwidth
+                logger.debug("Deactivating hardware antenna...")
+                subprocess.run(['bluetoothctl', 'scan', 'off'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4)
                 
-                # --- FALLBACK SYSTEM CONTROLLER CACHE CHECK ---
-                logger.debug("Querying local bluetoothctl cache for previously paired devices...")
+                # 4. Pull ALL nearby discovered devices directly from the system's memory cache
+                logger.debug("Extracting total gathered device table...")
                 cache_res = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True)
+                
+                # Parse format: "Device AA:BB:CC:DD:EE:FF Device_Name"
                 cache_matches = re.findall(r'Device\s+([0-9A-Fa-f:]{17})\s+(.+)', cache_res.stdout)
+                
                 for mac, name in cache_matches:
                     name_clean = name.strip()
+                    # Skip placeholders that just repeat the MAC address or are empty
                     if name_clean and ":" not in name_clean and "-" not in name_clean:
-                        if mac not in found_registry:
-                            logger.debug(f"Pulled device from cache: '{name_clean}' [{mac}]")
+                        logger.info(f"Target identified and captured: '{name_clean}' [{mac}]")
                         found_registry[mac] = name_clean
                         
             except Exception as e:
-                logger.exception("Fatal exception encountered during background scan worker loop:")
+                logger.exception("Exception encountered during background scan collection:")
             finally:
                 self.discovered_devices = [{"mac": mac, "name": name} for mac, name in found_registry.items()]
                 self._is_scanning = False
