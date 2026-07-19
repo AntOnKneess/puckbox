@@ -1,4 +1,46 @@
-<!-- --- NEW: BLUETOOTH CONTROLS SECTION --- -->
+{% extends 'layout.html' %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h2>System Settings & Audio Routing</h2>
+    <p style="color: #64748b;">Configure hardware devices and map alternative peripheral routing rules here.</p>
+
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+    <div style="padding: 25px; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <h3 style="margin-top: 0;">Select Audio Output Device</h3>
+        <p style="color: #64748b; font-size: 0.95em; line-height: 1.5;">
+            Choose which physical system sound card interface Pygame will direct streaming music playback into (e.g., HDMI, Onboard Jack, or USB Sound Cards).
+        </p>
+
+        <form action="{{ url_for('settings_page') }}" method="POST" style="margin-top: 20px;">
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: bold;">Available Playback Engines:</label>
+                <select name="device_name" style="padding: 10px; width: 100%; max-width: 450px; font-family: monospace; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #fff;">
+                    <option value="Default Hardware Device">-- Default System Soundcard Output --</option>
+                    {% for device in devices %}
+                        <option value="{{ device }}" {% if device == current_device %}selected{% endif %}>{{ device }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="action-btn" style="background: #10b981; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.95em;">
+                Apply Hardware Target
+            </button>
+        </form>
+
+        <!-- --- NEW: MASTER VOLUME SLIDER SECTION --- -->
+        <div style="margin-top: 35px; border-top: 1px solid #f1f5f9; padding-top: 25px;">
+            <h3 style="margin-top: 0;">Master Playback Volume</h3>
+            <p style="color: #64748b; font-size: 0.95em;">Adjust the active engine volume scale in real-time.</p>
+            
+            <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
+                <input type="range" id="volumeSlider" min="0" max="100" value="{{ current_volume }}" style="width: 100%; max-width: 350px; cursor: pointer;">
+                <span id="volumeDisplay" style="font-family: monospace; font-weight: bold; font-size: 1.1em; width: 40px;">{{ current_volume }}%</span>
+            </div>
+        </div>
+    </div>
+
     <div style="margin-top: 25px; padding: 25px; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
         <h3 style="margin-top: 0;">Bluetooth Peripheral Manager</h3>
         <p style="color: #64748b; font-size: 0.95em;">Scan and connect to local wireless headphones or speaker devices.</p>
@@ -13,6 +55,37 @@
             <!-- Async JavaScript populates this dynamically -->
         </ul>
     </div>
+
+    <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <a href="{{ url_for('upload_file') }}" style="color: #3b82f6; text-decoration: none; font-weight: 500;">
+            &larr; Return back to Audio & Tag Management Hub
+        </a>
+    </div>
+</div>
+
+<!-- Async JavaScript to change volume fluidly without page refreshes -->
+<script>
+    const slider = document.getElementById('volumeSlider');
+    const display = document.getElementById('volumeDisplay');
+
+    slider.addEventListener('input', function() {
+        const volumeVal = this.value;
+        display.textContent = volumeVal + '%';
+
+        // Post the value over to our Flask endpoint API
+        fetch("{{ url_for('set_volume_api') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ volume: parseInt(volumeVal) })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                console.error("Volume adjustment update failed");
+            }
+        });
+    });
+</script>
 
 <script>
     // --- BLUETOOTH FRONTEND INTERACTIONS ENGINE ---
@@ -83,3 +156,4 @@
         });
     }
 </script>
+{% endblock %}
