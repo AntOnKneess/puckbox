@@ -1,6 +1,7 @@
 import os
 import time
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+from bluetooth_manager import BluetoothManager
 
 scan_state = {
     "is_scanning": False,
@@ -12,7 +13,8 @@ def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_fu
     app = Flask(__name__)
     app.config['UPLOAD_FOLDER'] = 'static/audio'
     app.config['SCAN_STATE'] = scan_state
-
+    bt_manager = BluetoothManager()
+    
     @app.route('/')
     def index():
         return render_template('index.html') 
@@ -91,5 +93,32 @@ def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_fu
             devices=devices, 
             current_volume=current_volume
         )
+    
+    @app.route('/api/bluetooth/scan', methods=['POST'])
+    def bt_start_scan():
+        bt_manager.start_scan(duration=6)
+        return jsonify({"status": "scanning_started"})
+
+    @app.route('/api/bluetooth/status', methods=['GET'])
+    def bt_status():
+        return jsonify(bt_manager.get_scan_status())
+
+    @app.route('/api/bluetooth/connect', methods=['POST'])
+    def bt_connect():
+        data = request.get_json() or {}
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({"status": "error", "message": "Missing MAC address"}), 400
+        res = bt_manager.connect_device(mac)
+        return jsonify(res)
+
+    @app.route('/api/bluetooth/disconnect', methods=['POST'])
+    def bt_disconnect():
+        data = request.get_json() or {}
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({"status": "error", "message": "Missing MAC address"}), 400
+        res = bt_manager.disconnect_device(mac)
+        return jsonify(res)
 
     return app
