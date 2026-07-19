@@ -60,9 +60,10 @@ class BluetoothManager:
             self._initialize_controller()
             
             try:
-                logger.debug("Opening interactive bluetoothctl pipe stream...")
+                logger.debug("Opening interactive unbuffered bluetoothctl pipe stream...")
+                # Prefix the array command vector with stdbuf -oL 
                 proc = subprocess.Popen(
-                    ['bluetoothctl', 'scan', 'on'], 
+                    ['stdbuf', '-oL', 'bluetoothctl', 'scan', 'on'], 
                     stdout=subprocess.PIPE, 
                     stderr=subprocess.PIPE, 
                     text=True,
