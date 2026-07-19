@@ -2,17 +2,15 @@ import os
 import time
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
-# Global variables for capturing tag scans
 scan_state = {
     "is_scanning": False,
     "captured_tag": None
 }
 
-def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_func):
+# --- UPDATE: Added get_volume_func & set_volume_func as initialization dependencies ---
+def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_func, get_volume_func, set_volume_func):
     app = Flask(__name__)
     app.config['UPLOAD_FOLDER'] = 'static/audio'
-    
-    # Expose the scan state to the app context so the NFC thread can see it
     app.config['SCAN_STATE'] = scan_state
 
     @app.route('/')
@@ -45,26 +43,33 @@ def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_fu
             save_mappings_func()
         return redirect(url_for('upload_file'))
 
-    # --- NEW API ENDPOINTS FOR CAPTURING ---
-
     @app.route('/api/start-scan', methods=['POST'])
     def start_scan():
-        """Triggers the system to intercept the next physical or mock scan."""
         scan_state['is_scanning'] = True
         scan_state['captured_tag'] = None
         return jsonify({"status": "scanning"})
 
     @app.route('/api/check-scan', methods=['GET'])
     def check_scan():
-        """Polled by the frontend to see if a tag has been captured."""
         if scan_state['captured_tag']:
             tag = scan_state['captured_tag']
-            # Reset state now that it's consumed
             scan_state['is_scanning'] = False
             scan_state['captured_tag'] = None
             return jsonify({"status": "found", "tag_id": tag})
-        
         return jsonify({"status": "waiting"})
+
+    # --- NEW API ROUTE FOR PROCESSING LIVE AUDIO VOLUME REQUESTS ---
+    @app.route('/api/set-volume', methods=['POST'])
+    def set_volume_api():
+        data = request.get_json() or {}
+        volume_val = data.get('volume')
+        if volume_val is not None:
+            try:
+                set_volume_func(int(volume_val))
+                return jsonify({"status": "success", "volume": volume_val})
+            except ValueError:
+                pass
+        return jsonify({"status": "error", "message": "Invalid volume payload"}), 400
 
     @app.route('/settings', methods=['GET', 'POST'])
     def settings_page():
@@ -73,8 +78,18 @@ def create_app(tag_mappings, save_mappings_func, get_devices_func, set_device_fu
             set_device_func(chosen_device)
             return redirect(url_for('settings_page'))
             
-        # GET request fetches the hardware device array directly from audio_manager
         devices = get_devices_func()
-        return render_template('settings.html', devices=devices)
+        
+        # Pull dynamic variables out of our current execution context
+        # assuming your set_device_func/audio_manager structure allows device tracking
+        # If your set_device_func is mapped to audio_manager.set_audio_device, you can expose attributes directly
+        current_volume = get_volume_func()
+        
+        # Render the template injecting the extra configuration trackers
+        return render_template(
+            'settings.html', 
+            devices=devices, 
+            current_volume=current_volume
+        )
 
     return app
