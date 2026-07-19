@@ -25,7 +25,9 @@ app = create_app(
     tag_mappings=tag_mappings, 
     save_mappings_func=save_mappings,
     get_devices_func=audio_manager.get_audio_devices,
-    set_device_func=audio_manager.set_audio_device
+    set_device_func=audio_manager.set_audio_device,
+    get_volume_func=audio_manager.get_volume,
+    set_volume_func=audio_manager.set_volume
 )
 
 nfc_subsystem = NFCReader(app.config, tag_mappings)
