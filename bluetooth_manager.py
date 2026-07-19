@@ -12,7 +12,11 @@ class BluetoothManager:
     def _initialize_controller(self):
         """Ensures the hardware adapter is powered on and ready to communicate."""
         try:
-            # Force target adapter power state and generic pairing agent registration
+            # Force unblock at the kernel hardware layer first
+            subprocess.run(['sudo', 'rfkill', 'unblock', 'bluetooth'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(0.5)
+            
+            # Force the internal BlueZ stack to switch to an active power state
             subprocess.run(['bluetoothctl', 'power', 'on'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(['bluetoothctl', 'agent', 'on'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(['bluetoothctl', 'default-agent'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
