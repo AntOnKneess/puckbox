@@ -68,6 +68,7 @@ class BluetoothManager:
                 time.sleep(0.5)
                 
                 # Fetch ALL nearby discovered devices directly from the system's memory cache
+                # Fetch ALL nearby discovered devices directly from the system's memory cache
                 logger.debug("Extracting gathered device tables from system cache...")
                 cache_res = subprocess.run(['bluetoothctl', 'devices'], capture_output=True, text=True)
                 
@@ -77,13 +78,19 @@ class BluetoothManager:
                 for mac, name in cache_matches:
                     name_clean = name.strip()
                     
-                    # --- OPTIMIZED FILTERING ---
-                    # Only skip if the name is completely empty or identical to a MAC address structure
-                    is_just_a_mac = bool(re.match(r'^([0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$', name_clean))
+                    # Check if the name is missing, blank, or just a repeat of the MAC address
+                    is_placeholder = (
+                        not name_clean or 
+                        ":" in name_clean or 
+                        "-" in name_clean or 
+                        bool(re.match(r'^([0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$', name_clean))
+                    )
                     
-                    if name_clean and not is_just_a_mac:
-                        logger.info(f"Target identified and captured: '{name_clean}' [{mac}]")
-                        found_registry[mac] = name_clean
+                    # If it's a placeholder, display the MAC address so the user can still click it!
+                    display_name = mac if is_placeholder else name_clean
+                    
+                    logger.info(f"Target identified and captured: '{display_name}' [{mac}]")
+                    found_registry[mac] = display_name
                         
             except Exception as e:
                 logger.exception("Exception encountered during background scan collection:")
